@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マナ キャッチャー - モーセの物語</title>
+    <meta name="description" content="モーセがマナを集める楽しいゲーム。砂漠を舞台に空から降ってくるマナをキャッチしよう！">
+    <meta property="og:title" content="マナ キャッチャー - モーセの物語">
+    <meta property="og:description" content="モーセがマナを集める楽しいゲーム。砂漠を舞台に空から降ってくるマナをキャッチしよう！">
+    <meta property="og:type" content="website">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #87CEEB, #F0E68C);
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .game-container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        canvas {
+            border: 3px solid #8B4513;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 30%, #F0E68C 70%, #DEB887 100%);
+            border-radius: 10px;
+        }
+        
+        .ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            color: #4A4A4A;
+            font-weight: bold;
+        }
+        
+        .lives {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .life {
+            width: 20px;
+            height: 20px;
+            background: #FF1493;
+            border-radius: 50%;
+            border: 2px solid #8B0000;
+            position: relative;
+        }
+        
+        .life::before {
+            content: '♥';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 14px;
+        }
+        
+        .controls {
+            margin-top: 15px;
+            color: #4A4A4A;
+        }
+        
+        .title {
+            margin-bottom: 20px;
+            color: #8B4513;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+            display: none;
+        }
+        
+        .restart-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        
+        .restart-btn:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="title">マナ キャッチャー</div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="ui">
+            <div class="score">スコア: <span id="score">0</span></div>
+            <div class="lives" id="lives">
+                <div class="life"></div>
+                <div class="life"></div>
+                <div class="life"></div>
+                <div class="life"></div>
+                <div class="life"></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            矢印キー または A/D キーで移動 | スマホは画面タッチで移動 | スペースキーで一時停止
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <div>ゲームオーバー</div>
+            <div>最終スコア: <span id="finalScore">0</span></div>
+            <button class="restart-btn" onclick="restartGame()">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        // ゲーム状態
+        let gameState = 'playing'; // 'playing', 'paused', 'gameOver'
+        let score = 0;
+        let lives = 5;
+        let gameSpeed = 1;
+        
+        // 雲の配列
+        let clouds = [];
+        
+        // 雲クラス
+        class Cloud {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * 150;
+                this.speed = 0.3 + Math.random() * 0.7;
+                this.size = 30 + Math.random() * 40;
+            }
+            
+            update() {
+                this.x += this.speed;
+                if (this.x > canvas.width + this.size) {
+                    this.x = -this.size;
+                    this.y = Math.random() * 150;
+                }
+            }
+            
+            draw() {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.globalAlpha = 0.8;
+                
+                // 雲の形を描画
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x + this.size * 0.3, this.y, this.size * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x - this.size * 0.3, this.y, this.size * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - this.size * 0.2, this.size * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalAlpha = 1;
+            }
+        }
+        
+        // 雲を初期化
+        function initClouds() {
+            clouds = [];
+            for (let i = 0; i < 5; i++) {
+                clouds.push(new Cloud());
+            }
+        }
+
+        // プレイヤー（モーセ）
+        const player = {
+            x: canvas.width / 2 - 50,
+            y: canvas.height - 100,
+            width: 100,
+            height: 80,
+            speed: 8
+        };
+
+        // 落下アイテム配列
+        let fallingItems = [];
+
+        // キー入力
+        const keys = {};
+        
+        // タッチ操作用の変数
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let isTouching = false;
+        
+        // イベントリスナー
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (gameState === 'playing') {
+                    gameState = 'paused';
+                } else if (gameState === 'paused') {
+                    gameState = 'playing';
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // タッチイベント
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchCurrentX = touchStartX;
+            isTouching = true;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isTouching) {
+                touchCurrentX = e.touches[0].clientX;
+            }
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isTouching = false;
+        });
+
+        // アイテムクラス
+        class FallingItem {
+            constructor(type) {
+                this.type = type; // 'mana' or 'quail'
+                this.x = Math.random() * (canvas.width - 40);
+                this.y = -40;
+                this.width = 40;
+                this.height = 40;
+                this.speed = 2 + Math.random() * 3;
+                this.color = type === 'mana' ? '#DEB887' : '#8B4513';
+            }
+
+            update() {
+                this.y += this.speed * gameSpeed;
+            }
+
+            draw() {
+                // マナ（白い丸いパン）の描画
+                if (this.type === 'mana') {
+                    const centerX = this.x + this.width / 2;
+                    const centerY = this.y + this.height / 2;
+                    const radius = this.width / 2;
+                    
+                    // 影
+                    ctx.fillStyle = '#E0E0E0';
+                    ctx.beginPath();
+                    ctx.arc(centerX + 2, centerY + 2, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // パンの本体（白い丸）
+                    ctx.fillStyle = '#FFFAF0';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius - 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // ハイライト
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(centerX - 5, centerY - 5, radius / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 縁取り
+                    ctx.strokeStyle = '#F5DEB3';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius - 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                // うずら（鳥の形）の描画
+                else if (this.type === 'quail') {
+                    // 鳥の体（楽円形）
+                    ctx.fillStyle = '#8B4513';
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + 20, this.y + 25, 15, 12, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 鳥の頭（丸）
+                    ctx.fillStyle = '#A0522D';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 20, this.y + 12, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 羽
+                    ctx.fillStyle = '#654321';
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + 10, this.y + 25, 8, 5, -0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + 30, this.y + 25, 8, 5, 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 鳥の目
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 16, this.y + 10, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x + 24, this.y + 10, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 目のハイライト
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 17, this.y + 9, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x + 25, this.y + 9, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // くちばし
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 20, this.y + 15);
+                    ctx.lineTo(this.x + 16, this.y + 20);
+                    ctx.lineTo(this.x + 24, this.y + 20);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // 足
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 16, this.y + 35);
+                    ctx.lineTo(this.x + 16, this.y + 40);
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 24, this.y + 35);
+                    ctx.lineTo(this.x + 24, this.y + 40);
+                    ctx.stroke();
+                }
+            }
+
+            isOffScreen() {
+                return this.y > canvas.height;
+            }
+        }
+
+        // プレイヤーを描画
+        function drawPlayer() {
+            // モーセのローブ（体）
+            ctx.fillStyle = '#4A4A4A';
+            ctx.fillRect(player.x + 25, player.y + 15, 50, 65);
+            
+            // ローブの装飾
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(player.x + 27, player.y + 17, 46, 3);
+            ctx.fillRect(player.x + 27, player.y + 35, 46, 2);
+            ctx.fillRect(player.x + 27, player.y + 50, 46, 2);
+            
+            // カゴ
+            ctx.fillStyle = '#DEB887';
+            ctx.fillRect(player.x, player.y + 60, 100, 20);
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(player.x, player.y + 60, 100, 20);
+            
+            // カゴの編み模様
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(player.x + 20 * i, player.y + 60);
+                ctx.lineTo(player.x + 20 * i, player.y + 80);
+                ctx.stroke();
+            }
+            
+            // モーセの頭
+            ctx.fillStyle = '#FFDBAC';
+            ctx.fillRect(player.x + 35, player.y, 30, 30);
+            
+            // 目
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(player.x + 40, player.y + 8, 3, 3);
+            ctx.fillRect(player.x + 57, player.y + 8, 3, 3);
+            
+            // 鼻
+            ctx.fillStyle = '#E6C2A6';
+            ctx.fillRect(player.x + 48, player.y + 12, 4, 6);
+            
+            // 髪とひげ（もっと長く）
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(player.x + 30, player.y - 5, 40, 10);
+            ctx.fillRect(player.x + 35, player.y + 20, 30, 25);
+            
+            // 杖（もっと装飾的に）
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(player.x + 75, player.y - 30, 6, 110);
+            
+            // 杖の先端（蛇のような装飾）
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(player.x + 73, player.y - 35, 10, 8);
+            ctx.fillRect(player.x + 71, player.y - 30, 6, 5);
+        }
+
+        // 衝突判定
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // アイテム生成
+        function spawnItem() {
+            const itemType = Math.random() < 0.15 ? 'quail' : 'mana'; // 15%の確率でうずら
+            fallingItems.push(new FallingItem(itemType));
+        }
+
+        // プレイヤー更新
+        function updatePlayer() {
+            // キーボード操作
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                player.x = Math.max(0, player.x - player.speed);
+            }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+            }
+            
+            // タッチ操作
+            if (isTouching) {
+                const canvasRect = canvas.getBoundingClientRect();
+                const touchX = touchCurrentX - canvasRect.left;
+                const targetX = touchX - player.width / 2;
+                
+                if (Math.abs(targetX - player.x) > 5) {
+                    if (targetX > player.x) {
+                        player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+                    } else {
+                        player.x = Math.max(0, player.x - player.speed);
+                    }
+                }
+            }
+        }
+
+        // ライフ表示更新
+        function updateLivesDisplay() {
+            const lifeElements = livesElement.children;
+            for (let i = 0; i < lifeElements.length; i++) {
+                lifeElements[i].style.opacity = i < lives ? '1' : '0.3';
+            }
+        }
+
+        // ゲームオーバー
+        function gameOver() {
+            gameState = 'gameOver';
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+        }
+
+        // ゲーム再開
+        function restartGame() {
+            gameState = 'playing';
+            score = 0;
+            lives = 5;
+            gameSpeed = 1;
+            fallingItems = [];
+            player.x = canvas.width / 2 - 50;
+            gameOverElement.style.display = 'none';
+            initClouds();
+            updateLivesDisplay();
+        }
+
+        // 背景を描画
+        function drawBackground() {
+            // 空のグラデーション
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.3, '#98D8E8');
+            gradient.addColorStop(0.7, '#F0E68C');
+            gradient.addColorStop(1, '#DEB887');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 雲を描画
+            for (let cloud of clouds) {
+                cloud.update();
+                cloud.draw();
+            }
+            
+            // 砂漠の地面
+            ctx.fillStyle = '#DEB887';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+            
+            // 砂漠の模様
+            ctx.fillStyle = '#D2B48C';
+            for (let i = 0; i < canvas.width; i += 20) {
+                ctx.fillRect(i, canvas.height - 35, 10, 3);
+                ctx.fillRect(i + 10, canvas.height - 25, 8, 2);
+            }
+            
+            // 砂丘の起伏
+            ctx.fillStyle = '#CD853F';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 40);
+            for (let i = 0; i < canvas.width; i += 50) {
+                ctx.lineTo(i, canvas.height - 40 - Math.sin(i * 0.02) * 5);
+            }
+            ctx.lineTo(canvas.width, canvas.height - 40);
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.fill();
+        }
+        
+        // ゲームループ
+        function gameLoop() {
+            if (gameState !== 'playing') {
+                if (gameState === 'paused') {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '48px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('一時停止', canvas.width / 2, canvas.height / 2);
+                    ctx.textAlign = 'left';
+                }
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            // 背景描画
+            drawBackground();
+
+            // プレイヤー更新と描画
+            updatePlayer();
+            drawPlayer();
+
+            // アイテム生成
+            if (Math.random() < 0.015) {
+                spawnItem();
+            }
+
+            // アイテム更新
+            for (let i = fallingItems.length - 1; i >= 0; i--) {
+                const item = fallingItems[i];
+                item.update();
+                item.draw();
+
+                // 衝突判定
+                if (checkCollision(player, item)) {
+                    if (item.type === 'mana') {
+                        score += 10;
+                    } else if (item.type === 'quail') {
+                        lives = Math.min(5, lives + 1);
+                        score += 50;
+                    }
+                    fallingItems.splice(i, 1);
+                    continue;
+                }
+
+                // 画面外に出たアイテム
+                if (item.isOffScreen()) {
+                    if (item.type === 'mana') {
+                        lives--;
+                        if (lives <= 0) {
+                            gameOver();
+                            return;
+                        }
+                    }
+                    fallingItems.splice(i, 1);
+                }
+            }
+
+            // ゲーム速度増加
+            gameSpeed = 1 + score / 1000;
+
+            // UI更新
+            scoreElement.textContent = score;
+            updateLivesDisplay();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ゲーム開始
+        initClouds();
+        updateLivesDisplay();
+        gameLoop();
+    </script>
+</body>
+</html>
