@@ -49,22 +49,42 @@
         }
         
         .life {
-            width: 20px;
-            height: 20px;
-            background: #FF1493;
-            border-radius: 50%;
-            border: 2px solid #8B0000;
+            width: 24px;
+            height: 30px;
+            background: linear-gradient(to bottom, #F5F5DC 0%, #E6E6FA 50%, #D3D3D3 100%);
+            border: 2px solid #8B4513;
+            border-radius: 3px 3px 0 0;
             position: relative;
+            margin: 0 2px;
         }
         
         .life::before {
-            content: '♥';
+            content: '';
             position: absolute;
-            top: 50%;
+            top: 2px;
             left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 14px;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 1px;
+            background: #8B4513;
+            box-shadow: 
+                0 3px 0 #8B4513,
+                0 6px 0 #8B4513,
+                0 9px 0 #8B4513,
+                0 12px 0 #8B4513;
+        }
+        
+        .life::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 4px solid #8B4513;
         }
         
         .controls {
