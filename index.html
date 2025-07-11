@@ -401,41 +401,73 @@
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 bgmGain = audioContext.createGain();
-                bgmGain.gain.value = 0.1;
+                bgmGain.gain.value = 0.05;
                 bgmGain.connect(audioContext.destination);
             }
         }
         
-        function playNote(frequency, duration, time) {
-            const oscillator = audioContext.createOscillator();
-            const noteGain = audioContext.createGain();
-            
-            oscillator.frequency.value = frequency;
-            oscillator.type = 'sine';
-            
-            noteGain.gain.setValueAtTime(0, time);
-            noteGain.gain.linearRampToValueAtTime(0.1, time + 0.1);
-            noteGain.gain.linearRampToValueAtTime(0, time + duration);
-            
-            oscillator.connect(noteGain);
-            noteGain.connect(bgmGain);
-            
-            oscillator.start(time);
-            oscillator.stop(time + duration);
-        }
         
         function playBGM() {
             if (!audioContext || !isPlaying) return;
             
-            const melodyNotes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88];
+            // ポケモン風の明るいメロディパターン
+            const melodyPatterns = [
+                // パターン1: 明るい上昇メロディ
+                [261.63, 293.66, 329.63, 392.00, 329.63, 293.66, 261.63, 293.66],
+                // パターン2: 楽しいバウンシーメロディ
+                [392.00, 329.63, 440.00, 392.00, 349.23, 329.63, 392.00, 349.23],
+                // パターン3: 冒険的なメロディ
+                [523.25, 493.88, 440.00, 392.00, 440.00, 493.88, 523.25, 587.33]
+            ];
+            
+            const currentPattern = melodyPatterns[Math.floor(Math.random() * melodyPatterns.length)];
             const time = audioContext.currentTime;
             
-            for (let i = 0; i < 8; i++) {
-                const note = melodyNotes[Math.floor(Math.random() * melodyNotes.length)];
-                playNote(note, 0.5, time + i * 0.6);
+            // メインメロディ
+            for (let i = 0; i < currentPattern.length; i++) {
+                playBrightNote(currentPattern[i], 0.4, time + i * 0.3, 'triangle');
             }
             
-            setTimeout(() => playBGM(), 5000);
+            // ハーモニー（3度上）
+            for (let i = 0; i < currentPattern.length; i++) {
+                if (i % 2 === 0) { // 偶数拍のみ
+                    playBrightNote(currentPattern[i] * 1.26, 0.3, time + i * 0.3, 'sine');
+                }
+            }
+            
+            // ベース音（低音）
+            for (let i = 0; i < 4; i++) {
+                playBrightNote(currentPattern[0] / 2, 0.6, time + i * 0.6, 'sawtooth');
+            }
+            
+            setTimeout(() => playBGM(), 3000);
+        }
+        
+        function playBrightNote(frequency, duration, time, waveType = 'triangle') {
+            const oscillator = audioContext.createOscillator();
+            const noteGain = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+            
+            oscillator.frequency.value = frequency;
+            oscillator.type = waveType;
+            
+            // フィルターで明るい音色に
+            filter.type = 'lowpass';
+            filter.frequency.value = frequency * 2;
+            filter.Q.value = 1;
+            
+            // エンベロープで跳ねるような音に
+            noteGain.gain.setValueAtTime(0, time);
+            noteGain.gain.linearRampToValueAtTime(0.15, time + 0.05);
+            noteGain.gain.exponentialRampToValueAtTime(0.05, time + duration * 0.7);
+            noteGain.gain.linearRampToValueAtTime(0.001, time + duration);
+            
+            oscillator.connect(filter);
+            filter.connect(noteGain);
+            noteGain.connect(bgmGain);
+            
+            oscillator.start(time);
+            oscillator.stop(time + duration);
         }
         
         function toggleMusic() {
@@ -819,7 +851,8 @@
             // タッチ操作
             if (isTouching) {
                 const canvasRect = canvas.getBoundingClientRect();
-                const touchX = touchCurrentX - canvasRect.left;
+                const scaleX = canvas.width / canvasRect.width;
+                const touchX = (touchCurrentX - canvasRect.left) * scaleX;
                 const targetX = touchX - player.width / 2;
                 
                 if (Math.abs(targetX - player.x) > 5) {
